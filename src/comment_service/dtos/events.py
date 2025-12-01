@@ -1,0 +1,6 @@
+from __future__ import annotations
+
+# TODO: Импортировать события из contracts.events.comments_v1
+# class CommentCreatedEvent(BaseModel): ...
+# class CommentLikedEvent(BaseModel): ...
+

@@ -1,0 +1,6 @@
+from __future__ import annotations
+
+# TODO: Перенести в contracts.events.comment_v1
+# class CommentCreatedV1(BaseModel): ...
+# class CommentLikedV1(BaseModel): ...
+
