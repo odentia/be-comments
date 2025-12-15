@@ -22,7 +22,7 @@ class CommentModel(Base):
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     entity_type: Mapped[Literal["post", "game"]] = mapped_column(String(10), nullable=False, index=True)
     author_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    author_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    author_username: Mapped[str] = mapped_column(String(255), nullable=False)
     author_avatar: Mapped[str | None] = mapped_column(String(512))
     text: Mapped[str] = mapped_column(Text, nullable=False)
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("comments.id", ondelete="CASCADE"), index=True)

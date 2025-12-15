@@ -22,7 +22,7 @@ def upgrade() -> None:
         sa.Column('entity_id', sa.Integer(), nullable=False),
         sa.Column('entity_type', sa.String(length=10), nullable=False),
         sa.Column('author_id', sa.Integer(), nullable=False),
-        sa.Column('author_name', sa.String(length=255), nullable=False),
+        sa.Column('author_username', sa.String(length=255), nullable=False),
         sa.Column('author_avatar', sa.String(length=512), nullable=True),
         sa.Column('text', sa.Text(), nullable=False),
         sa.Column('parent_id', sa.Integer(), nullable=True),

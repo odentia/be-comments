@@ -14,7 +14,26 @@ sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 # Загружаем переменные окружения из .env если есть (ДО импорта моделей)
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    # Пытаемся загрузить .env с обработкой ошибок кодировки
+    try:
+        load_dotenv(encoding="utf-8")
+    except (UnicodeDecodeError, Exception):
+        # Если не удалось из-за кодировки, пробуем загрузить только переменные без комментариев
+        env_path = Path(__file__).resolve().parents[1] / ".env"
+        if env_path.exists():
+            try:
+                with open(env_path, "rb") as f:
+                    content = f.read().decode("utf-8", errors="ignore")
+                # Фильтруем только строки с переменными
+                lines = [line.strip() for line in content.split("\n") 
+                        if line.strip() and not line.strip().startswith("#") and "=" in line.strip()]
+                # Устанавливаем переменные напрямую
+                for line in lines:
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        os.environ[key.strip()] = value.strip().strip('"').strip("'")
+            except Exception:
+                pass
 except ImportError:
     pass
 
@@ -28,8 +47,26 @@ if config.config_file_name is not None:
 
 # Получаем URL из переменных окружения или из alembic.ini
 # Важно: загружаем после load_dotenv()
-ALEMBIC_DATABASE_URL = os.getenv("ALEMBIC_DATABASE_URL")
-ASYNC_URL = os.getenv("DATABASE_URL")
+# Очищаем URL от проблемных символов кодировки
+def _clean_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    # Удаляем не-UTF-8 символы и лишние пробелы
+    try:
+        # Сначала пытаемся декодировать как UTF-8, игнорируя ошибки
+        if isinstance(url, bytes):
+            url = url.decode('utf-8', errors='ignore')
+        # Удаляем не-UTF-8 символы
+        cleaned = url.encode('utf-8', errors='ignore').decode('utf-8').strip()
+        return cleaned
+    except Exception:
+        return url.strip() if url else None
+
+_raw_alembic_url = os.getenv("ALEMBIC_DATABASE_URL")
+_raw_async_url = os.getenv("DATABASE_URL")
+
+ALEMBIC_DATABASE_URL = _clean_url(_raw_alembic_url)
+ASYNC_URL = _clean_url(_raw_async_url)
 
 # Если DATABASE_URL не установлен, пытаемся использовать значение из alembic.ini
 if not ASYNC_URL and not ALEMBIC_DATABASE_URL:
@@ -72,7 +109,9 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     if not ASYNC_URL:
         raise RuntimeError("Set DATABASE_URL for async migrations")
-    connectable = create_async_engine(ASYNC_URL, poolclass=pool.NullPool)
+    # Очищаем URL перед использованием
+    clean_url = str(ASYNC_URL).encode('utf-8', errors='ignore').decode('utf-8')
+    connectable = create_async_engine(clean_url, poolclass=pool.NullPool)
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
@@ -81,9 +120,27 @@ async def run_async_migrations() -> None:
 def run_migrations_online() -> None:
     # Приоритет: ALEMBIC_DATABASE_URL > DATABASE_URL > alembic.ini
     if ALEMBIC_DATABASE_URL:
+        # Парсим URL и заменяем драйвер на psycopg3
+        from urllib.parse import urlparse, unquote
+        try:
+            url_str = str(ALEMBIC_DATABASE_URL).encode('utf-8', errors='ignore').decode('utf-8')
+            parsed = urlparse(url_str)
+            
+            # Если это PostgreSQL, используем psycopg3 вместо psycopg2
+            if parsed.scheme in ('postgresql', 'postgresql+psycopg2'):
+                # Заменяем на psycopg3
+                clean_url = url_str.replace('postgresql+psycopg2://', 'postgresql+psycopg://').replace('postgresql://', 'postgresql+psycopg://')
+            else:
+                clean_url = url_str
+        except Exception:
+            # Если не удалось распарсить, используем как есть с заменой драйвера
+            clean_url = str(ALEMBIC_DATABASE_URL).encode('utf-8', errors='ignore').decode('utf-8')
+            if clean_url.startswith('postgresql://') and '+psycopg' not in clean_url:
+                clean_url = clean_url.replace('postgresql://', 'postgresql+psycopg://')
+        
         # Используем синхронный URL напрямую
         synchronous_engine = create_engine(
-            ALEMBIC_DATABASE_URL,
+            clean_url,
             poolclass=pool.NullPool,
         )
         with synchronous_engine.connect() as connection:

@@ -27,35 +27,7 @@ class CommentAppService:
             limit=5,
         )
 
-        items = []
-        for comment in comments:
-            children_count = await self.comment_repo.count_children(comment.id)
-            is_liked = False
-            is_disliked = False
-            if user_id:
-                reaction = await self.comment_repo.get_user_reaction(comment.id, user_id)
-                is_liked = reaction == "like"
-                is_disliked = reaction == "dislike"
-
-            items.append(
-                CommentDto(
-                    id=comment.id,
-                    author=AuthorDto(
-                        id=comment.author_id,
-                        name=comment.author_name,
-                        avatar=comment.author_avatar,
-                    ),
-                    date=comment.created_at,
-                    text=comment.text,
-                    isPositive=comment.is_positive,
-                    rating=comment.rating,
-                    parentId=comment.parent_id,
-                    childrenCount=children_count,
-                    isLikedMe=is_liked,
-                    isDisLikedMe=is_disliked,
-                    type=comment.entity_type,
-                )
-            )
+        items = [await self._build_comment_dto(comment, user_id) for comment in comments]
 
         return CommentListResponse(
             items=items,
@@ -75,35 +47,7 @@ class CommentAppService:
             limit=5,
         )
 
-        items = []
-        for comment in comments:
-            children_count = await self.comment_repo.count_children(comment.id)
-            is_liked = False
-            is_disliked = False
-            if user_id:
-                reaction = await self.comment_repo.get_user_reaction(comment.id, user_id)
-                is_liked = reaction == "like"
-                is_disliked = reaction == "dislike"
-
-            items.append(
-                CommentDto(
-                    id=comment.id,
-                    author=AuthorDto(
-                        id=comment.author_id,
-                        name=comment.author_name,
-                        avatar=comment.author_avatar,
-                    ),
-                    date=comment.created_at,
-                    text=comment.text,
-                    isPositive=comment.is_positive,
-                    rating=comment.rating,
-                    parentId=comment.parent_id,
-                    childrenCount=children_count,
-                    isLikedMe=is_liked,
-                    isDisLikedMe=is_disliked,
-                    type=comment.entity_type,
-                )
-            )
+        items = [await self._build_comment_dto(comment, user_id) for comment in comments]
 
         return CommentListResponse(
             items=items,
@@ -116,7 +60,7 @@ class CommentAppService:
         entity_id: int,
         entity_type: Literal["post", "game"],
         author_id: int,
-        author_name: str,
+        author_username: str,
         author_avatar: Optional[str],
         text: str,
         parent_id: Optional[int] = None,
@@ -126,7 +70,7 @@ class CommentAppService:
             entity_id=entity_id,
             entity_type=entity_type,
             author_id=author_id,
-            author_name=author_name,
+            author_username=author_username,
             author_avatar=author_avatar,
             text=text,
             parent_id=parent_id,
@@ -135,23 +79,45 @@ class CommentAppService:
         )
 
         saved = await self.comment_repo.create(comment)
-        children_count = await self.comment_repo.count_children(saved.id)
+        return await self._build_comment_dto(saved, user_id=None)
+
+    async def set_reaction(
+        self,
+        comment_id: int,
+        user_id: int,
+        reaction: Literal["like", "dislike"],
+    ) -> CommentDto:
+        """Поставить реакцию и вернуть обновленный комментарий"""
+        await self.comment_repo.set_user_reaction(comment_id, user_id, reaction)
+        updated = await self.comment_repo.get_by_id(comment_id)
+        if not updated:
+            raise ValueError("Comment not found after reaction update")
+        return await self._build_comment_dto(updated, user_id=user_id)
+
+    async def _build_comment_dto(self, comment: Comment, user_id: Optional[int]) -> CommentDto:
+        children_count = await self.comment_repo.count_children(comment.id)
+        is_liked = False
+        is_disliked = False
+        if user_id:
+            reaction = await self.comment_repo.get_user_reaction(comment.id, user_id)
+            is_liked = reaction == "like"
+            is_disliked = reaction == "dislike"
 
         return CommentDto(
-            id=saved.id,
+            id=comment.id,
             author=AuthorDto(
-                id=saved.author_id,
-                name=saved.author_name,
-                avatar=saved.author_avatar,
+                id=comment.author_id,
+                username=comment.author_username,
+                avatar=comment.author_avatar,
             ),
-            date=saved.created_at,
-            text=saved.text,
-            isPositive=saved.is_positive,
-            rating=saved.rating,
-            parentId=saved.parent_id,
+            date=comment.created_at,
+            text=comment.text,
+            isPositive=comment.is_positive,
+            rating=comment.rating,
+            parentId=comment.parent_id,
             childrenCount=children_count,
-            isLikedMe=False,
-            isDisLikedMe=False,
-            type=saved.entity_type,
+            isLikedByMe=is_liked,
+            isDislikedByMe=is_disliked,
+            type=comment.entity_type,
         )
 

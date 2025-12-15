@@ -48,3 +48,5 @@ JWT_SECRET_KEY=<your key>
 - `POST /api/v1/game/{id}/comments` — создать комментарий к игре
 - `POST /api/v1/post/comments/{id}/replies` — ответить на комментарий поста
 - `POST /api/v1/game/comments/{id}/replies` — ответить на комментарий игры
+- `POST /api/v1/post/comments/{id}/like|dislike` — лайк/дизлайк комментария поста
+- `POST /api/v1/game/comments/{id}/like|dislike` — лайк/дизлайк комментария игры

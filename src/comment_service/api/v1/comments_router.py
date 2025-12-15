@@ -91,7 +91,7 @@ async def create_post_comment(
         entity_id=entity_id,
         entity_type="post",
         author_id=user["user_id"],
-        author_name=user.get("name", ""),
+        author_username=user.get("username", ""),
         author_avatar=user.get("avatar"),
         text=request.text,
         parent_id=None,
@@ -111,7 +111,7 @@ async def create_game_comment(
         entity_id=entity_id,
         entity_type="game",
         author_id=user["user_id"],
-        author_name=user.get("name", ""),
+        author_username=user.get("username", ""),
         author_avatar=user.get("avatar"),
         text=request.text,
         parent_id=None,
@@ -135,7 +135,7 @@ async def reply_to_post_comment(
         entity_id=parent_comment.entity_id,
         entity_type=parent_comment.entity_type,
         author_id=user["user_id"],
-        author_name=user.get("name", ""),
+        author_username=user.get("username", ""),
         author_avatar=user.get("avatar"),
         text=request.text,
         parent_id=comment_id,
@@ -159,10 +159,50 @@ async def reply_to_game_comment(
         entity_id=parent_comment.entity_id,
         entity_type=parent_comment.entity_type,
         author_id=user["user_id"],
-        author_name=user.get("name", ""),
+        author_username=user.get("username", ""),
         author_avatar=user.get("avatar"),
         text=request.text,
         parent_id=comment_id,
     )
     return CreateCommentResponse(comment=comment)
+
+
+@post_router.post("/comments/{comment_id}/like", response_model=CommentDto)
+async def like_post_comment(
+    comment_id: int,
+    user: CurrentUserDep,
+    comment_service: CommentAppService = Depends(get_comment_service),
+) -> CommentDto:
+    """Лайкнуть комментарий поста (требует авторизации)"""
+    return await comment_service.set_reaction(comment_id=comment_id, user_id=user["user_id"], reaction="like")
+
+
+@post_router.post("/comments/{comment_id}/dislike", response_model=CommentDto)
+async def dislike_post_comment(
+    comment_id: int,
+    user: CurrentUserDep,
+    comment_service: CommentAppService = Depends(get_comment_service),
+) -> CommentDto:
+    """Дизлайкнуть комментарий поста (требует авторизации)"""
+    return await comment_service.set_reaction(comment_id=comment_id, user_id=user["user_id"], reaction="dislike")
+
+
+@game_router.post("/comments/{comment_id}/like", response_model=CommentDto)
+async def like_game_comment(
+    comment_id: int,
+    user: CurrentUserDep,
+    comment_service: CommentAppService = Depends(get_comment_service),
+) -> CommentDto:
+    """Лайкнуть комментарий игры (требует авторизации)"""
+    return await comment_service.set_reaction(comment_id=comment_id, user_id=user["user_id"], reaction="like")
+
+
+@game_router.post("/comments/{comment_id}/dislike", response_model=CommentDto)
+async def dislike_game_comment(
+    comment_id: int,
+    user: CurrentUserDep,
+    comment_service: CommentAppService = Depends(get_comment_service),
+) -> CommentDto:
+    """Дизлайкнуть комментарий игры (требует авторизации)"""
+    return await comment_service.set_reaction(comment_id=comment_id, user_id=user["user_id"], reaction="dislike")
 

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 class AuthorDto(BaseModel):
     id: int
-    name: str
+    username: str
     avatar: Optional[str] = None
 
 
@@ -21,8 +21,8 @@ class CommentDto(BaseModel):
     rating: int
     parentId: Optional[int] = None
     childrenCount: int
-    isLikedMe: bool
-    isDisLikedMe: bool
+    isLikedByMe: bool
+    isDislikedByMe: bool
     type: Literal["post", "game"]
 
 

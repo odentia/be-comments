@@ -141,6 +141,18 @@ curl -X POST "http://localhost:8011/api/v1/post/123/comments" \
   -d '{"text": "очень годный пост"}'
 ```
 
+### Лайк / дизлайк комментария
+
+```bash
+# Лайк
+curl -X POST "http://localhost:8011/api/v1/post/comments/42/like" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Дизлайк
+curl -X POST "http://localhost:8011/api/v1/post/comments/42/dislike" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 **Ответ:**
 ```json
 {

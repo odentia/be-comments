@@ -8,7 +8,7 @@ from typing import Literal
 @dataclass
 class Author:
     id: int
-    name: str
+    username: str
     avatar: str | None = None
 
 
@@ -19,7 +19,7 @@ class Comment:
     entity_id: int  # ID поста или игры
     entity_type: Literal["post", "game"]
     author_id: int
-    author_name: str
+    author_username: str
     author_avatar: str | None
     text: str
     parent_id: int | None  # None = корневой комментарий

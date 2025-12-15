@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Protocol, Tuple
+from typing import List, Optional, Protocol, Tuple, Literal
 
 from comment_service.domain.models import Comment
 

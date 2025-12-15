@@ -79,10 +79,11 @@ async def require_authenticated_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token payload",
             )
+        username = payload.get("username") or payload.get("name", "")
         return {
             "user_id": int(user_id),
             "email": payload.get("email"),
-            "name": payload.get("name", ""),
+            "username": username,
             "avatar": payload.get("avatar"),
         }
     except JWTError:
@@ -113,10 +114,11 @@ async def get_optional_user(
         user_id = payload.get("sub")
         if not user_id:
             return None
+        username = payload.get("username") or payload.get("name", "")
         return {
             "user_id": int(user_id),
             "email": payload.get("email"),
-            "name": payload.get("name", ""),
+            "username": username,
             "avatar": payload.get("avatar"),
         }
     except JWTError:
