@@ -162,3 +162,42 @@ class SQLCommentRepository(CommentRepository):
 
         await self.update_rating(comment_id, rating, is_positive)
         await self.session.commit()
+
+    async def count_by_entity(self, entity_id: int, entity_type: str) -> int:
+        """Подсчитать количество комментариев к указанной сущности (включая дочерние)"""
+        result = await self.session.execute(
+            select(func.count(m.CommentModel.id)).where(
+                and_(
+                    m.CommentModel.entity_id == entity_id,
+                    m.CommentModel.entity_type == entity_type
+                )
+            )
+        )
+        return result.scalar_one() or 0
+
+    async def delete_by_entity(self, entity_id: int, entity_type: str) -> int:
+        """Удалить все комментарии к указанной сущности. Возвращает количество удаленных комментариев."""
+        # Сначала удаляем реакции к комментариям этой сущности
+        subquery = select(m.CommentModel.id).where(
+            and_(
+                m.CommentModel.entity_id == entity_id,
+                m.CommentModel.entity_type == entity_type
+            )
+        )
+        
+        stmt_reactions = delete(m.CommentReactionModel).where(
+            m.CommentReactionModel.comment_id.in_(subquery)
+        )
+        await self.session.execute(stmt_reactions)
+        
+        # Затем удаляем сами комментарии
+        stmt_comments = delete(m.CommentModel).where(
+            and_(
+                m.CommentModel.entity_id == entity_id,
+                m.CommentModel.entity_type == entity_type
+            )
+        )
+        result = await self.session.execute(stmt_comments)
+        await self.session.commit()
+        
+        return result.rowcount

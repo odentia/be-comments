@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite+aiosqlite:///./comments.db")
     sql_echo: bool = Field(default=False)
 
+    # --- RabbitMQ ---
+    rabbitmq_url: str = Field(
+        default="amqp://guest:guest@localhost:5672/",
+        description="RabbitMQ connection URL",
+    )
+
     jwt_secret_key: str = Field(default="your-secret-key-change-in-production")
     jwt_algorithm: str = Field(default="HS256")
 

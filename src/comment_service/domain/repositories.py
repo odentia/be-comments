@@ -60,3 +60,11 @@ class CommentRepository(Protocol):
         """Установить реакцию пользователя (like/dislike или None для удаления)"""
         ...
 
+    async def delete_by_entity(self, entity_id: int, entity_type: str) -> int:
+        """Удалить все комментарии к указанной сущности. Возвращает количество удаленных комментариев."""
+        ...
+
+    async def count_by_entity(self, entity_id: int, entity_type: str) -> int:
+        """Подсчитать количество комментариев к указанной сущности (включая дочерние)"""
+        ...
+

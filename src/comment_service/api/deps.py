@@ -12,6 +12,7 @@ from comment_service.core.config import Settings
 from comment_service.core.db import get_session_factory
 from comment_service.repo.sql.repositories import SQLCommentRepository
 from comment_service.services.comment_service import CommentAppService
+from comment_service.mq.publisher import EventPublisher
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -42,11 +43,21 @@ def get_comment_repository(
     return SQLCommentRepository(session)
 
 
+def get_event_publisher(request: Request) -> EventPublisher | None:
+    """Получить event publisher из app state"""
+    return getattr(request.app.state, "event_publisher", None)
+
+
 def get_comment_service(
     comment_repo: Annotated[SQLCommentRepository, Depends(get_comment_repository)],
     settings: Annotated[Settings, Depends(get_settings)],
+    event_publisher: Annotated[EventPublisher | None, Depends(get_event_publisher)] = None,
 ) -> CommentAppService:
-    return CommentAppService(comment_repo=comment_repo, settings=settings)
+    return CommentAppService(
+        comment_repo=comment_repo,
+        settings=settings,
+        event_publisher=event_publisher,
+    )
 
 
 async def get_current_token(
