@@ -29,7 +29,17 @@ class Settings(BaseSettings):
     reload: bool = Field(default=False)
 
     cors_allow_origins: list[str] = Field(
-        default_factory=lambda: ["*", "http://localhost:3000", "http://127.0.0.1:3000"]
+        default_factory=lambda: [
+            "*",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:3010",
+            "http://127.0.0.1:3010",
+            "http://localhost:3020",
+            "http://127.0.0.1:3020",
+            "http://localhost:3030",
+            "http://127.0.0.1:3030",
+        ]
     )
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
