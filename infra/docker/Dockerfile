@@ -11,6 +11,7 @@ COPY pyproject.toml uv.lock README.md ./
 # Copy all files needed for installation
 COPY src/ ./src/
 COPY alembic.ini ./
+COPY alembic/ ./alembic/
 
 # Install dependencies to system Python
 RUN uv pip install --system -e .
