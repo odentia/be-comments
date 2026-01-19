@@ -183,11 +183,20 @@ jobs:
             fi
             
             echo "Stopping and removing old containers..."
+            # Находим и останавливаем контейнер, занимающий порт 8011
+            CONTAINER_ON_PORT=$(docker ps --filter "publish=8011" --format '{{.ID}}' | head -n1 || echo "")
+            if [ -n "$CONTAINER_ON_PORT" ]; then
+              echo "Found container $CONTAINER_ON_PORT using port 8011, stopping it..."
+              docker stop $CONTAINER_ON_PORT || true
+              docker rm $CONTAINER_ON_PORT || true
+            fi
             # Останавливаем контейнер по имени, если он существует
             docker stop comment-service || true
             docker rm comment-service || true
             # Останавливаем все контейнеры из docker-compose
             docker compose down || true
+            # Даем время Docker освободить порт
+            sleep 2
             
             echo "Pulling Docker images..."
             docker compose pull || exit 1
