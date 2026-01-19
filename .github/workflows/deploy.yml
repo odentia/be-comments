@@ -1,0 +1,237 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build and Push Docker images to GHCR"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            mkdir -p ~/comment-service
+            cd ~/comment-service
+            
+            RABBITMQ_USER="${{ secrets.RABBITMQ_USER || 'guest' }}"
+            RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD || 'guest' }}"
+            
+            # Находим контейнер RabbitMQ по порту 5672 или имени
+            echo "Searching for RabbitMQ container..."
+            RABBITMQ_CONTAINER=$(docker ps --filter "publish=5672" --format '{{.Names}}' | head -n1 || docker ps --format '{{.Names}}' | grep -i rabbitmq | head -n1 || echo "")
+            if [ -z "$RABBITMQ_CONTAINER" ]; then
+              echo "RabbitMQ container not found, using known IP 172.19.0.2"
+              RABBITMQ_HOST="172.19.0.2"
+              RABBITMQ_NETWORK=""
+            else
+              echo "Found RabbitMQ container: $RABBITMQ_CONTAINER"
+              # Получаем все сети RabbitMQ контейнера
+              echo "Inspecting RabbitMQ container networks..."
+              docker inspect $RABBITMQ_CONTAINER --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' || echo "Failed to inspect"
+              # Берем первую не-default сеть
+              RABBITMQ_NETWORK=$(docker inspect $RABBITMQ_CONTAINER --format '{{range $k, $v := .NetworkSettings.Networks}}{{if ne $k "bridge"}}{{$k}}{{break}}{{end}}{{end}}' 2>/dev/null || echo "")
+              if [ -z "$RABBITMQ_NETWORK" ]; then
+                echo "Trying to get first network..."
+                RABBITMQ_NETWORK=$(docker inspect $RABBITMQ_CONTAINER --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{break}}{{end}}' 2>/dev/null || echo "")
+              fi
+              if [ -z "$RABBITMQ_NETWORK" ]; then
+                echo "Trying docker network ls..."
+                RABBITMQ_NETWORK=$(docker network ls --filter "name=rabbitmq" --format '{{.Name}}' | head -n1 || docker network ls --filter "name=infra" --format '{{.Name}}' | head -n1 || echo "")
+              fi
+              echo "RabbitMQ network determined: '$RABBITMQ_NETWORK'"
+              # Используем имя контейнера (лучше чем IP, так как имя не меняется)
+              RABBITMQ_HOST="$RABBITMQ_CONTAINER"
+              echo "Will use container name: $RABBITMQ_HOST"
+            fi
+            echo "Final RABBITMQ_NETWORK value: '$RABBITMQ_NETWORK'"
+            
+            RABBITMQ_URL="amqp://$RABBITMQ_USER:$RABBITMQ_PASSWORD@${RABBITMQ_HOST}:5672/"
+            echo "RABBITMQ_URL will be set to: amqp://$RABBITMQ_USER:***@${RABBITMQ_HOST}:5672/"
+            
+            # Формируем DATABASE_URL из тех же переменных, что используются для postgres
+            POSTGRES_DB="${{ secrets.POSTGRES_DB || 'comments' }}"
+            POSTGRES_USER="${{ secrets.POSTGRES_USER || 'comments_user' }}"
+            POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
+            DATABASE_URL="postgresql+asyncpg://$POSTGRES_USER:$POSTGRES_PASSWORD@comment-service-postgres:5432/$POSTGRES_DB"
+            echo "DATABASE_URL will be set to: postgresql+asyncpg://$POSTGRES_USER:***@comment-service-postgres:5432/$POSTGRES_DB"
+            
+            cat > docker-compose.yml << DOCKER_COMPOSE_EOF
+            services:
+              postgres:
+                image: postgres:16-alpine
+                container_name: comment-service-postgres
+                restart: unless-stopped
+                environment:
+                  POSTGRES_DB: $POSTGRES_DB
+                  POSTGRES_USER: $POSTGRES_USER
+                  POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+                ports:
+                  - "5436:5432"
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                networks:
+                  - comment-service-network
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+              comment-service:
+                image: ghcr.io/${{ github.repository_owner }}/comment-service:latest
+                container_name: comment-service
+                restart: unless-stopped
+                depends_on:
+                  postgres:
+                    condition: service_healthy
+                ports:
+                  - "8011:8011"
+                environment:
+                  - DATABASE_URL=$DATABASE_URL
+                  - RABBITMQ_URL=$RABBITMQ_URL
+                  - LOG_LEVEL=INFO
+                networks:
+                  - comment-service-network
+            DOCKER_COMPOSE_EOF
+            
+            # Добавляем сеть RabbitMQ в список сетей comment-service, если она отличается
+            echo "=== Debug: RABBITMQ_NETWORK='$RABBITMQ_NETWORK' ==="
+            echo "Expected network: infra_rabbitmq_network"
+            
+            if [ -n "$RABBITMQ_NETWORK" ] && [ "$RABBITMQ_NETWORK" != "comment-service-network" ]; then
+              echo "=== Adding RabbitMQ network '$RABBITMQ_NETWORK' to comment-service ==="
+              echo "Before modification - networks section:"
+              sed -n '/^  comment-service:$/,/^networks:$/p' docker-compose.yml | grep -A 3 "networks:"
+              
+              # Используем awk для добавления сети после comment-service-network
+              # Ищем строку в секции comment-service (6 пробелов для списка сетей)
+              awk -v rabbitmq_net="$RABBITMQ_NETWORK" '
+                /^  comment-service:$/ { in_service=1 }
+                in_service && /^      - comment-service-network$/ {
+                  print
+                  print "      - " rabbitmq_net
+                  in_service=0
+                  next
+                }
+                { print }
+              ' docker-compose.yml > docker-compose.yml.tmp && mv docker-compose.yml.tmp docker-compose.yml
+              
+              echo "After modification - networks section:"
+              sed -n '/^  comment-service:$/,/^networks:$/p' docker-compose.yml | grep -A 3 "networks:"
+            else
+              echo "=== RabbitMQ network NOT added ==="
+              if [ -z "$RABBITMQ_NETWORK" ]; then
+                echo "Reason: RABBITMQ_NETWORK is empty"
+              elif [ "$RABBITMQ_NETWORK" = "comment-service-network" ]; then
+                echo "Reason: RABBITMQ_NETWORK equals comment-service-network"
+              fi
+              echo "RABBITMQ_NETWORK='$RABBITMQ_NETWORK'"
+            fi
+            
+            cat >> docker-compose.yml << DOCKER_COMPOSE_EOF
+            
+            networks:
+              comment-service-network:
+                driver: bridge
+            DOCKER_COMPOSE_EOF
+            
+            if [ -n "$RABBITMQ_NETWORK" ] && [ "$RABBITMQ_NETWORK" != "comment-service-network" ]; then
+              cat >> docker-compose.yml << DOCKER_COMPOSE_EOF
+              $RABBITMQ_NETWORK:
+                external: true
+            DOCKER_COMPOSE_EOF
+            fi
+            
+            cat >> docker-compose.yml << DOCKER_COMPOSE_EOF
+            
+            volumes:
+              postgres_data:
+            DOCKER_COMPOSE_EOF
+            
+            echo "Generated docker-compose.yml:"
+            cat docker-compose.yml
+            
+            echo "Checking if RabbitMQ network was added..."
+            if [ -n "$RABBITMQ_NETWORK" ] && [ "$RABBITMQ_NETWORK" != "comment-service-network" ]; then
+              echo "RabbitMQ network should be: $RABBITMQ_NETWORK"
+              echo "Checking networks section in comment-service:"
+              sed -n '/^              comment-service:$/,/^            DOCKER_COMPOSE_EOF$/p' docker-compose.yml | grep -A 5 "networks:" || echo "Could not find networks section"
+            fi
+            
+            cat > .env << EOF
+            POSTGRES_DB=${POSTGRES_DB}
+            POSTGRES_USER=${POSTGRES_USER}
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            DATABASE_URL=${DATABASE_URL}
+            EOF
+            
+            echo "Logging in to GHCR..."
+            if [ -n "${{ secrets.GHCR_TOKEN }}" ]; then
+              echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || exit 1
+            else
+              echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || exit 1
+            fi
+            
+            echo "Pulling Docker images..."
+            docker compose pull || exit 1
+            
+            echo "Running database migrations..."
+            docker compose run --rm comment-service uv run alembic upgrade head || echo "Migration failed or not needed"
+            
+            echo "Starting containers..."
+            echo "=== Checking docker-compose.yml before start ==="
+            echo "Full docker-compose.yml content:"
+            cat docker-compose.yml
+            echo "=== End of docker-compose.yml ==="
+            
+            # Принудительно пересоздаем контейнер, чтобы применить изменения сетей
+            docker compose up -d --force-recreate comment-service || docker compose up -d || exit 1
+            
+            echo "Waiting for containers to start..."
+            sleep 5
+            
+            echo "Checking container status..."
+            docker compose ps
+            
+            echo "Checking logs..."
+            docker compose logs --tail=50
+            
+            echo "Checking comment-service environment variables:"
+            docker exec comment-service env | grep RABBITMQ_URL || echo "RABBITMQ_URL not found in environment"
+            
+            echo "Checking comment-service networks:"
+            docker inspect comment-service --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' || echo "Failed to inspect container"
+            
+            if [ -n "$RABBITMQ_NETWORK" ] && [ "$RABBITMQ_NETWORK" != "comment-service-network" ]; then
+              echo "Verifying RabbitMQ network connection..."
+              echo "Trying to resolve 'rabbitmq' hostname..."
+              docker exec comment-service ping -c 2 rabbitmq > /dev/null 2>&1 && echo " RabbitMQ hostname 'rabbitmq' resolves" || echo "⚠️  RabbitMQ hostname 'rabbitmq' does not resolve"
+              
+              echo "Checking what containers are in $RABBITMQ_NETWORK network..."
+              docker network inspect $RABBITMQ_NETWORK --format '{{range .Containers}}{{.Name}} ({{.IPv4Address}}){{"\n"}}{{end}}' || echo "Failed to inspect network"
+              
+              echo "Checking RabbitMQ container name and aliases..."
+              if [ -n "$RABBITMQ_CONTAINER" ]; then
+                docker inspect $RABBITMQ_CONTAINER --format 'Name: {{.Name}}{{"\n"}}Aliases in networks:{{range $net, $conf := .NetworkSettings.Networks}}{{"\n"}}  {{$net}}: {{range $conf.Aliases}}{{.}} {{end}}{{end}}' || echo "Failed to inspect RabbitMQ container"
+              fi
+            fi
+            
+            echo "Checking for RabbitMQ connection errors in logs..."
+            echo "=== Recent RabbitMQ/AMQP logs from comment-service ==="
+            docker compose logs comment-service 2>&1 | grep -i "rabbitmq\|amqp\|connection" | tail -20 || echo "No RabbitMQ-related logs found"
+            echo "=== Checking if comment-service is trying to connect to RabbitMQ ==="
+            docker compose logs comment-service 2>&1 | grep -i "error\|failed\|exception" | tail -10 || echo "No errors found"
+            echo "=== Full recent logs from comment-service ==="
+            docker compose logs comment-service --tail=30 2>&1 | tail -30
+            
+            docker image prune -f
