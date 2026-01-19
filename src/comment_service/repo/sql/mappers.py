@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from comment_service.domain.models import Author, Comment
+from comment_service.domain.models import Comment
 from comment_service.repo.sql import models as m
 
 
