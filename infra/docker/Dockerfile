@@ -16,7 +16,7 @@ COPY alembic/ ./alembic/
 # Install dependencies to system Python
 RUN uv pip install --system -e .
 
-EXPOSE 8011
+EXPOSE 8012
 
 CMD ["uv", "run", "python", "-m", "comment_service.api"]
 

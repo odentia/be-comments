@@ -25,10 +25,12 @@ class Settings(BaseSettings):
     alembic_database_url: str | None = None
 
     http_host: str = Field(default="0.0.0.0")
-    http_port: int = Field(default=8011)
+    http_port: int = Field(default=8012)
     reload: bool = Field(default=False)
 
-    cors_allow_origins: list[str] = Field(default_factory=lambda: ["*"])
+    cors_allow_origins: list[str] = Field(
+        default_factory=lambda: ["*", "http://localhost:3000", "http://127.0.0.1:3000"]
+    )
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
