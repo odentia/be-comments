@@ -2,12 +2,18 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-
+# Install uv
 RUN pip install uv
-RUN uv pip install -e .
 
-COPY . .
+# Copy dependency files first
+COPY pyproject.toml uv.lock ./
+
+# Copy all files needed for installation
+COPY src/ ./src/
+COPY alembic.ini ./
+
+# Install dependencies to system Python
+RUN uv pip install --system -e .
 
 EXPOSE 8011
 
