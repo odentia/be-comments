@@ -87,7 +87,7 @@ class CommentAppService:
         )
 
         saved = await self.comment_repo.create(comment)
-        
+
         # Публикуем событие создания комментария
         if self.event_publisher:
             try:
@@ -101,11 +101,10 @@ class CommentAppService:
                         parent_id=saved.parent_id,
                     )
                 )
-                
+
                 # Подсчитываем и публикуем обновление счетчика комментариев
                 comment_count = await self.comment_repo.count_by_entity(
-                    entity_id=saved.entity_id,
-                    entity_type=saved.entity_type
+                    entity_id=saved.entity_id, entity_type=saved.entity_type
                 )
                 await self.event_publisher.publish(
                     CommentCountUpdatedEvent(
@@ -117,9 +116,10 @@ class CommentAppService:
             except Exception as e:
                 # Логируем ошибку, но не прерываем выполнение
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to publish comment events: {e}")
-        
+
         return await self._build_comment_dto(saved, user_id=None)
 
     async def set_reaction(
@@ -161,4 +161,3 @@ class CommentAppService:
             isDislikedByMe=is_disliked,
             type=comment.entity_type,
         )
-

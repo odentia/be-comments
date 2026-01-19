@@ -7,6 +7,7 @@ from typing import Literal, Optional
 
 class CommentEvent(BaseModel):
     """Базовое событие комментария"""
+
     event_type: str
     timestamp: datetime = datetime.utcnow()
     service: str = "comment-service"
@@ -14,6 +15,7 @@ class CommentEvent(BaseModel):
 
 class CommentCreatedEvent(CommentEvent):
     """Событие создания комментария"""
+
     event_type: str = "comment_created"
     comment_id: int
     entity_id: int
@@ -25,6 +27,7 @@ class CommentCreatedEvent(CommentEvent):
 
 class CommentDeletedEvent(CommentEvent):
     """Событие удаления комментария"""
+
     event_type: str = "comment_deleted"
     comment_id: int
     entity_id: int
@@ -33,6 +36,7 @@ class CommentDeletedEvent(CommentEvent):
 
 class CommentCountUpdatedEvent(CommentEvent):
     """Событие обновления количества комментариев (для синхронизации с post_service)"""
+
     event_type: str = "comment_count_updated"
     entity_id: int
     entity_type: Literal["post", "game"]

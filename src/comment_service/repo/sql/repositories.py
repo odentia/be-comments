@@ -25,7 +25,9 @@ class SQLCommentRepository(CommentRepository):
         return mappers.comment_to_domain(model)
 
     async def get_by_id(self, comment_id: int) -> Optional[Comment]:
-        result = await self.session.execute(select(m.CommentModel).where(m.CommentModel.id == comment_id))
+        result = await self.session.execute(
+            select(m.CommentModel).where(m.CommentModel.id == comment_id)
+        )
         model = result.scalars().first()
         return mappers.comment_to_domain(model) if model else None
 
@@ -36,13 +38,17 @@ class SQLCommentRepository(CommentRepository):
         cursor: Optional[str] = None,
         limit: int = 5,
     ) -> Tuple[List[Comment], Optional[str]]:
-        query = select(m.CommentModel).where(
-            and_(
-                m.CommentModel.entity_id == entity_id,
-                m.CommentModel.entity_type == entity_type,
-                m.CommentModel.parent_id.is_(None),
+        query = (
+            select(m.CommentModel)
+            .where(
+                and_(
+                    m.CommentModel.entity_id == entity_id,
+                    m.CommentModel.entity_type == entity_type,
+                    m.CommentModel.parent_id.is_(None),
+                )
             )
-        ).order_by(m.CommentModel.created_at.asc())
+            .order_by(m.CommentModel.created_at.asc())
+        )
 
         if cursor:
             cursor_id = decode_cursor(cursor)
@@ -66,9 +72,11 @@ class SQLCommentRepository(CommentRepository):
         cursor: Optional[str] = None,
         limit: int = 5,
     ) -> Tuple[List[Comment], Optional[str]]:
-        query = select(m.CommentModel).where(
-            m.CommentModel.parent_id == parent_id
-        ).order_by(m.CommentModel.created_at.asc())
+        query = (
+            select(m.CommentModel)
+            .where(m.CommentModel.parent_id == parent_id)
+            .order_by(m.CommentModel.created_at.asc())
+        )
 
         if cursor:
             cursor_id = decode_cursor(cursor)
@@ -102,7 +110,9 @@ class SQLCommentRepository(CommentRepository):
             model.is_positive = is_positive
             await self.session.commit()
 
-    async def get_user_reaction(self, comment_id: int, user_id: int) -> Optional[Literal["like", "dislike"]]:
+    async def get_user_reaction(
+        self, comment_id: int, user_id: int
+    ) -> Optional[Literal["like", "dislike"]]:
         result = await self.session.execute(
             select(m.CommentReactionModel).where(
                 and_(
@@ -168,8 +178,7 @@ class SQLCommentRepository(CommentRepository):
         result = await self.session.execute(
             select(func.count(m.CommentModel.id)).where(
                 and_(
-                    m.CommentModel.entity_id == entity_id,
-                    m.CommentModel.entity_type == entity_type
+                    m.CommentModel.entity_id == entity_id, m.CommentModel.entity_type == entity_type
                 )
             )
         )
@@ -179,25 +188,19 @@ class SQLCommentRepository(CommentRepository):
         """Удалить все комментарии к указанной сущности. Возвращает количество удаленных комментариев."""
         # Сначала удаляем реакции к комментариям этой сущности
         subquery = select(m.CommentModel.id).where(
-            and_(
-                m.CommentModel.entity_id == entity_id,
-                m.CommentModel.entity_type == entity_type
-            )
+            and_(m.CommentModel.entity_id == entity_id, m.CommentModel.entity_type == entity_type)
         )
-        
+
         stmt_reactions = delete(m.CommentReactionModel).where(
             m.CommentReactionModel.comment_id.in_(subquery)
         )
         await self.session.execute(stmt_reactions)
-        
+
         # Затем удаляем сами комментарии
         stmt_comments = delete(m.CommentModel).where(
-            and_(
-                m.CommentModel.entity_id == entity_id,
-                m.CommentModel.entity_type == entity_type
-            )
+            and_(m.CommentModel.entity_id == entity_id, m.CommentModel.entity_type == entity_type)
         )
         result = await self.session.execute(stmt_comments)
         await self.session.commit()
-        
+
         return result.rowcount

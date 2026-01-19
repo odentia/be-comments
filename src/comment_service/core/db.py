@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from comment_service.core.logging import get_logger
 
@@ -38,4 +43,3 @@ async def close_engine(engine: AsyncEngine | None = None) -> None:
 
 def get_session_factory() -> async_sessionmaker[AsyncSession] | None:
     return _session_factory
-

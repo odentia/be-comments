@@ -5,7 +5,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from comment_service.api.deps import CurrentUserDep, OptionalUserDep, get_comment_service
-from comment_service.dtos.http import CommentDto, CommentListResponse, CreateCommentRequest, CreateCommentResponse
+from comment_service.dtos.http import (
+    CommentDto,
+    CommentListResponse,
+    CreateCommentRequest,
+    CreateCommentResponse,
+)
 from comment_service.services.comment_service import CommentAppService
 
 
@@ -130,7 +135,7 @@ async def reply_to_post_comment(
     parent_comment = await comment_service.comment_repo.get_by_id(comment_id)
     if not parent_comment:
         raise HTTPException(status_code=404, detail="Parent comment not found")
-    
+
     comment = await comment_service.create_comment(
         entity_id=parent_comment.entity_id,
         entity_type=parent_comment.entity_type,
@@ -154,7 +159,7 @@ async def reply_to_game_comment(
     parent_comment = await comment_service.comment_repo.get_by_id(comment_id)
     if not parent_comment:
         raise HTTPException(status_code=404, detail="Parent comment not found")
-    
+
     comment = await comment_service.create_comment(
         entity_id=parent_comment.entity_id,
         entity_type=parent_comment.entity_type,
@@ -174,7 +179,9 @@ async def like_post_comment(
     comment_service: CommentAppService = Depends(get_comment_service),
 ) -> CommentDto:
     """Лайкнуть комментарий поста (требует авторизации)"""
-    return await comment_service.set_reaction(comment_id=comment_id, user_id=user["user_id"], reaction="like")
+    return await comment_service.set_reaction(
+        comment_id=comment_id, user_id=user["user_id"], reaction="like"
+    )
 
 
 @post_router.post("/comments/{comment_id}/dislike", response_model=CommentDto)
@@ -184,7 +191,9 @@ async def dislike_post_comment(
     comment_service: CommentAppService = Depends(get_comment_service),
 ) -> CommentDto:
     """Дизлайкнуть комментарий поста (требует авторизации)"""
-    return await comment_service.set_reaction(comment_id=comment_id, user_id=user["user_id"], reaction="dislike")
+    return await comment_service.set_reaction(
+        comment_id=comment_id, user_id=user["user_id"], reaction="dislike"
+    )
 
 
 @game_router.post("/comments/{comment_id}/like", response_model=CommentDto)
@@ -194,7 +203,9 @@ async def like_game_comment(
     comment_service: CommentAppService = Depends(get_comment_service),
 ) -> CommentDto:
     """Лайкнуть комментарий игры (требует авторизации)"""
-    return await comment_service.set_reaction(comment_id=comment_id, user_id=user["user_id"], reaction="like")
+    return await comment_service.set_reaction(
+        comment_id=comment_id, user_id=user["user_id"], reaction="like"
+    )
 
 
 @game_router.post("/comments/{comment_id}/dislike", response_model=CommentDto)
@@ -204,5 +215,6 @@ async def dislike_game_comment(
     comment_service: CommentAppService = Depends(get_comment_service),
 ) -> CommentDto:
     """Дизлайкнуть комментарий игры (требует авторизации)"""
-    return await comment_service.set_reaction(comment_id=comment_id, user_id=user["user_id"], reaction="dislike")
-
+    return await comment_service.set_reaction(
+        comment_id=comment_id, user_id=user["user_id"], reaction="dislike"
+    )

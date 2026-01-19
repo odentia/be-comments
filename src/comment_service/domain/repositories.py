@@ -8,11 +8,9 @@ from comment_service.domain.models import Comment
 class CommentRepository(Protocol):
     """Репозиторий для работы с комментариями"""
 
-    async def create(self, comment: Comment) -> Comment:
-        ...
+    async def create(self, comment: Comment) -> Comment: ...
 
-    async def get_by_id(self, comment_id: int) -> Optional[Comment]:
-        ...
+    async def get_by_id(self, comment_id: int) -> Optional[Comment]: ...
 
     async def list_root_comments(
         self,
@@ -47,7 +45,9 @@ class CommentRepository(Protocol):
         """Обновить рейтинг комментария"""
         ...
 
-    async def get_user_reaction(self, comment_id: int, user_id: int) -> Optional[Literal["like", "dislike"]]:
+    async def get_user_reaction(
+        self, comment_id: int, user_id: int
+    ) -> Optional[Literal["like", "dislike"]]:
         """Получить реакцию пользователя на комментарий (like/dislike или None)"""
         ...
 
@@ -67,4 +67,3 @@ class CommentRepository(Protocol):
     async def count_by_entity(self, entity_id: int, entity_type: str) -> int:
         """Подсчитать количество комментариев к указанной сущности (включая дочерние)"""
         ...
-

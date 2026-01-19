@@ -15,6 +15,7 @@ class Author:
 @dataclass
 class Comment:
     """Доменная модель комментария"""
+
     id: int
     entity_id: int  # ID поста или игры
     entity_type: Literal["post", "game"]
@@ -27,4 +28,3 @@ class Comment:
     is_positive: bool = True  # общий тон (больше лайков = True)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-

@@ -5,7 +5,12 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 
 from comment_service.core.config import Settings
-from comment_service.core.db import init_engine, init_session_factory, close_engine, get_session_factory
+from comment_service.core.db import (
+    init_engine,
+    init_session_factory,
+    close_engine,
+    get_session_factory,
+)
 from comment_service.core.logging import get_logger
 from comment_service.mq.consumer import EventConsumer
 from comment_service.mq.publisher import EventPublisher
@@ -18,27 +23,29 @@ async def handle_post_deleted(event_data: dict):
     """Обработчик события удаления поста - удаляем все комментарии к этому посту"""
     try:
         post_id = event_data.get("post_id") or event_data.get("postId")
-        
+
         if not post_id:
             log.warning(f"Invalid event data for post_deleted: {event_data}")
             return
-        
+
         session_factory = get_session_factory()
         if not session_factory:
             log.error("Session factory not initialized")
             return
-        
+
         async with session_factory() as session:
             comment_repo = SQLCommentRepository(session)
-            
+
             # Удаляем все комментарии к посту
-            deleted_count = await comment_repo.delete_by_entity(entity_id=int(post_id), entity_type="post")
-            
+            deleted_count = await comment_repo.delete_by_entity(
+                entity_id=int(post_id), entity_type="post"
+            )
+
             if deleted_count > 0:
                 log.info(f"Deleted {deleted_count} comments for post {post_id}")
             else:
                 log.info(f"No comments found for post {post_id}")
-                
+
     except Exception as e:
         log.error(f"Error handling post_deleted event: {e}")
 
@@ -76,10 +83,10 @@ def build_lifespan(settings: Settings):
             # Initialize event consumer
             consumer = EventConsumer(settings)
             await consumer.connect()
-            
+
             # Регистрируем обработчики событий
             consumer.register_handler("post_deleted", handle_post_deleted)
-            
+
             # Запускаем consumer в фоновой задаче
             consumer_task = asyncio.create_task(start_consumer(consumer))
             app.state.consumer = consumer
@@ -102,19 +109,19 @@ def build_lifespan(settings: Settings):
             app.state.ready = False
 
             # Останавливаем consumer
-            if hasattr(app.state, 'consumer_task') and app.state.consumer_task:
+            if hasattr(app.state, "consumer_task") and app.state.consumer_task:
                 app.state.consumer_task.cancel()
                 try:
                     await app.state.consumer_task
                 except asyncio.CancelledError:
                     pass
-            
-            if hasattr(app.state, 'consumer'):
+
+            if hasattr(app.state, "consumer"):
                 await app.state.consumer.close()
                 log.info("Event consumer closed")
 
             # Close event publisher
-            if hasattr(app.state, 'event_publisher'):
+            if hasattr(app.state, "event_publisher"):
                 await app.state.event_publisher.close()
                 log.info("Event publisher closed")
 
@@ -124,4 +131,3 @@ def build_lifespan(settings: Settings):
             log.info("Bye")
 
     return lifespan
-

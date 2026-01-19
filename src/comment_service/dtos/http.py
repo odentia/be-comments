@@ -38,4 +38,3 @@ class CreateCommentRequest(BaseModel):
 
 class CreateCommentResponse(BaseModel):
     comment: CommentDto
-

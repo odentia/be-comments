@@ -20,9 +20,7 @@ class EventPublisher:
             self.channel = await self.connection.channel()
 
             self.exchange = await self.channel.declare_exchange(
-                "blog_events",
-                aio_pika.ExchangeType.TOPIC,
-                durable=True
+                "blog_events", aio_pika.ExchangeType.TOPIC, durable=True
             )
 
             logger.info("Event publisher connected to RabbitMQ successfully")
@@ -41,7 +39,7 @@ class EventPublisher:
             message = aio_pika.Message(
                 body=message_body,
                 content_type="application/json",
-                delivery_mode=aio_pika.DeliveryMode.PERSISTENT
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             )
 
             routing_key = f"comments.{event.event_type}"
@@ -57,4 +55,3 @@ class EventPublisher:
         if self.connection:
             await self.connection.close()
             logger.info("Event publisher connection closed")
-

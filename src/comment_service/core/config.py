@@ -85,4 +85,3 @@ def load_settings() -> Settings:
 
     defaults.cors_allow_origins = _parse_origins(os.getenv("CORS_ALLOW_ORIGINS"))
     return defaults
-

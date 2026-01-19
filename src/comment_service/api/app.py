@@ -32,4 +32,3 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(api_v1, prefix="/api")
     app.state.settings = settings
     return app
-

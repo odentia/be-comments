@@ -37,7 +37,7 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
 
 
 def get_comment_repository(
-    session: Annotated[AsyncSession, Depends(get_session)]
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> SQLCommentRepository:
     return SQLCommentRepository(session)
 

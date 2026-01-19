@@ -18,4 +18,3 @@ def decode_cursor(cursor: str) -> Optional[int]:
         return data.get("id")
     except Exception:
         return None
-
