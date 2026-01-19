@@ -183,6 +183,10 @@ jobs:
             fi
             
             echo "Stopping and removing old containers..."
+            # Останавливаем контейнер по имени, если он существует
+            docker stop comment-service || true
+            docker rm comment-service || true
+            # Останавливаем все контейнеры из docker-compose
             docker compose down || true
             
             echo "Pulling Docker images..."
